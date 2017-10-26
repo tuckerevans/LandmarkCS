@@ -35,7 +35,14 @@ typedef struct filestuff{
 };
 
 
-struct inode i_table[MAX_INODES];
+struct inode_list{
+	struct inode node;
+	struct inode_list *next;
+}
+
+
+int inode_list_size = 0;
+struct inode_list *root;
 
 char bitmap[128][4096/8];
 
@@ -115,6 +122,8 @@ int inode_init()
 	int n = MAX_INODES / 4;
 	int i;
 	char *ptr;
+	struct inode_list tmp;
+
 	if (MAX_INODES % 4 > 0)
 		n++;
 
@@ -125,9 +134,13 @@ int inode_init()
 	}
 	ptr = buf;
 
+	tmp = root;
 	for(i=0; i< MAX_INODES; i++) {
-		memcpy(&i_table[i], ptr, 64);
+		tmp->next = malloc(sizeof(struct inode_list));
+		memcpy(&tmp->node, ptr, 64);
 		ptr += 64;
+		tmp = tmp->next
+		inode_list_size++;
 	}
 }
 
@@ -136,10 +149,12 @@ void inode_save()
 {
 	int i, j;
 	char *buf = malloc(512);
+	struct inode_list tmp = root;
 
-	for (i = 0; i < MAX_INODES && i_table->info.name[0] != 0; i++) {
+	for (i = 0; i < MAX_INODES && tmp->next;i++) {
 		for (j = 0; j < 4; j++){
-			memcpy(buf + j, &i_table[(i * 4) + j], sizeof(struct inode));
+			tmp = tmp->next;
+			memcpy(buf + j, tmp->node, sizeof(struct inode));
 		}
 		wsector(0, INODE_START + i, buf);
 	}
