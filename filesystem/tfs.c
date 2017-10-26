@@ -26,7 +26,8 @@ struct meta_data{
 };
 
 struct inode {
-	struct meta_data info; struct block_ptr data[20];
+	struct meta_data info;
+	struct block_ptr data[20];
 };
 
 
@@ -265,21 +266,47 @@ int read(fd, buf)
 int fd;
 char *buf;
 {
+	if (files[fd].free || files[fd].mode || (files[fd].next_sec = 20))
+		return -1;
 	
+	rsector(files[fd].node->data[files[fd].next_sec].track, files[fd].node->data[files[fd].next_sec].sector, buf);
+	files[fd].next_sec++;
+	return 512;
 }
 
 int write(fd, buf)
 int fd;
 char *buf;
 {
-	
+	if ((files[fd].next_sec = 20) || !files[fd].mode)
+		return 0;
+
+	struct blockll *tmp = get_blocks(500);
+	files[fd].node->data[files[fd].next_sec].track = tmp->data.track;
+	files[fd].node->data[files[fd].next_sec].sector = tmp->data.sector;
+
+	wsector(files[fd].node->data[files[fd].next_sec].track, files[fd].node->data[files[fd].next_sec].sector, buf);
+	return 1;
 }
 
 int ulink(fname)
 char *fname;
 {
+	struct inode_list *tmp = root;
+	struct inode *d;
+	int i;
+
+	for(i = 0; i < MAX_INODES && i < inode_list_size; i++){
+		tmp = tmp->next;
+		if(strcmp(fname, tmp->next->node->info.name) == 0) 
+			break;;
+	}
 	
-}
+	d = tmp->next->node;
+	tmp->next = tmp->next->next;
+	free(d);
+	return 1;
+	}
 
 int main() 
 {
