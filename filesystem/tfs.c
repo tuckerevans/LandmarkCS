@@ -116,9 +116,9 @@ int size;
 	for (i = 0; size > 0 && i < (4096 * 128); i++) {
 		t = i / 4096;
 		s = i % 4096;
-		printf("checkedmap%d\t%d: %d\n", t,s,check_bitmap(t,s));
+
 		if (!check_bitmap(t, s)) {
-			current->next = calloc(1,sizeof(struct blockll));
+			current->next = malloc(sizeof(struct blockll));
 			current = current->next;
 			current-> next = NULL;
 			current->data.track = (char) t;
@@ -137,14 +137,20 @@ char *name;
 {
 	struct timeval *tmp_time = malloc(sizeof(struct timeval));
 
-	struct inode_list *tmp = calloc(1,sizeof(struct inode_list));
-	memcpy(&tmp->node->info.name, name, strlen(name));
+	struct inode_list *tmp = malloc(sizeof(struct inode_list));
+	struct inode *tmp_node = malloc(sizeof(struct inode));
+
+
+	tmp->node = tmp_node;
+	
+	memcpy(&(tmp->node->info.name), name, strlen(name));
 
 	gettimeofday(tmp_time, NULL);
+
 	tmp->node->info.create = tmp_time->tv_sec;
 	tmp->node->info.read = tmp_time->tv_sec;
 	tmp->node->info.write = tmp_time->tv_sec;
-	
+
 	end->next = tmp;
 	end = tmp;
 	inode_list_size++;
@@ -170,8 +176,9 @@ int inode_init()
 	ptr = buf;
 
 	tmp = root;
+
 	for(i=0; i< MAX_INODES; i++) {
-		tmp->next = calloc(1,sizeof(struct inode_list));
+		tmp->next = malloc(sizeof(struct inode_list));
 		memcpy(&tmp->node, ptr, 64);
 		ptr += 64;
 		tmp = tmp->next;
@@ -220,8 +227,15 @@ int find_fd()
 int tfs_init()
 {
 	int i;
+	root = malloc(sizeof(struct inode_list));
+	end = root;
+
 	dinit();
+	/*
+	 *
+	 * has issue if inodes have not been written to disk i.e. first run
 	inode_init();
+	*/
 	for (i = 0; i < MAX_FILES; i++) {
 		files[i].free = 1;
 	}
@@ -237,16 +251,15 @@ char *fname, *mode;
 	if (fnode == -1)
 		return -1;
 	
-	if (fnode == -2)
+	if (fnode == -2){
 		fnode = inode_create(fname)->node;
-
+	}
 	fd = find_fd();
 
 	files[fd].node = fnode;
 	files[fd].mode = *mode;
 	files[fd].next_sec = 0;
 	files[fd].free = 0;
-
 	size++;
 
 	return fd;
@@ -266,8 +279,9 @@ int read(fd, buf)
 int fd;
 char *buf;
 {
-	if (files[fd].free || files[fd].mode || (files[fd].next_sec = 20))
+	if (files[fd].free || files[fd].mode || (files[fd].next_sec == 20))
 		return -1;
+	
 	
 	rsector(files[fd].node->data[files[fd].next_sec].track, files[fd].node->data[files[fd].next_sec].sector, buf);
 	files[fd].next_sec++;
@@ -278,7 +292,7 @@ int write(fd, buf)
 int fd;
 char *buf;
 {
-	if ((files[fd].next_sec = 20) || !files[fd].mode)
+	if ((files[fd].next_sec == 20) || !files[fd].mode)
 		return 0;
 
 	struct blockll *tmp = get_blocks(500);
@@ -311,4 +325,28 @@ char *fname;
 int main() 
 {
 	tfs_init();
+
+	/*
+	 *Test Writing
+	 */
+	int mode = 1;
+	int fd = open("test", &mode);
+
+	char buf[512];
+	memcpy(&buf, "Hello Filesystem", strlen("Hello Filesystem"));
+
+	int test = write(fd, &buf);
+	close(fd);
+	
+	/*
+	 *Test reading
+	 */
+	mode = 0;
+	fd = open("test", &mode);
+	char buf2[512];
+	read(fd, &buf2);
+	printf("wrote: %s\n", buf);
+
+	printf("read: %s\n", buf2);
+
 }
