@@ -9,6 +9,10 @@ struct block_ptr {
 	char track;
 	short sector; 
 };
+struct blockll{
+	struct block_ptr data;
+	struct blockll *next;
+};
 
 struct meta_data{ 
 	char name[8];
@@ -38,34 +42,70 @@ int t,s;
 {
 	char tmp;
 	tmp = bitmap[t][s/8];
-	tmp &= (1 << (7-(s % 8)));
+	tmp &= (1 << (s % 8));
 	return (int) tmp;
 }
 
 void set_bitmap(t,s)
 int t,s;
 {
-	bitmap[t][s/8] |= (1 << (7-(s % 8)));
+	bitmap[t][s/8] |= (1 << (s % 8));
+	return;
 }
 
 void print_bitmap()
 {
 	int i,j;
-	for(i = 0; i < 4096; i++) {
+	for(i = 0; i < 128; i++){
+
 		printf("\n%4d  ", i);
-		for (j = 0; j < 128; j++) {
-			printf("%02x", bitmap[j][i]);
-			if (j == 63) {
+		for (j = 0; j < 4096/8; j++) {
+			printf("%02x", bitmap[i][j]);
+			if (j %31 == 0) {
 				printf("\n%4d  ",i);
 			}
 		}
 	}
 }
 
+
+/*  TODO
+ *  Implement inode table as binary tree to speedup searches
+ */
 int search_inodes(name)
 char *name;
 {
+	int i;
+	for(i = 0; i < MAX_INODES; i++){
+		if(strcmp(name, i_table[i].info.name) == 0) 
+			return i;
+	}
+}
 
+struct blockll* get_blocks(size)
+int size;
+{
+	int i, t, s;
+	struct blockll *root, *current = malloc(sizeof(struct blockll));
+	root = current;
+
+	for (i = 0; size > 0; i++) {
+		t = i / 4096;
+		s = i % 4096;
+		printf("checkedmap%d\t%d: %d\n", t,s,check_bitmap(t,s));
+		if (!check_bitmap(t, s)) {
+			current->next = malloc(sizeof(struct blockll));
+			current = current->next;
+			current-> next = NULL;
+			current->data.track = (char) t;
+			current->data.sector = (short) s;
+
+			set_bitmap(t,s);
+			size-= 512;
+		}
+	}
+
+	return root;
 }
 
 /*
@@ -125,9 +165,14 @@ char *fname;
 
 int main() 
 {
-	setBitmap(1,1);
-	setBitmap(2,2);
+	set_bitmap(0,0);
+	set_bitmap(2,2);
 
-	printf("test 1,1: %d,  test 2,2: %d\n", checkBitmap(1,1), checkBitmap(2,2));
-	printBitmap();
+	printf("test 1,1: %d,  test 2,2: %d\n", check_bitmap(1,1), check_bitmap(2,2));
+	print_bitmap();
+	
+
+	struct blockll *test = get_blocks(1000);
+
+	printf("&tets= %x\n", test);
 }
