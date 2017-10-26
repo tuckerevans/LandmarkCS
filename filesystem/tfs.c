@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/time.h>
 #include "disk.h"
 
 #define MAX_INODES 10
@@ -22,29 +23,23 @@ struct meta_data{
 	int read;
 	int write;
 	int create;
- };
-
-struct inode {
-	struct meta_data info;
-	struct block_ptr data[20];
 };
 
-typedef struct filestuff{
-	int fd;
-	struct inode file;
+struct inode {
+	struct meta_data info; struct block_ptr data[20];
 };
 
 
 struct inode_list{
-	struct inode node;
+	struct inode *node;
 	struct inode_list *next;
-}
+};
 
 
 int inode_list_size = 0;
-struct inode_list *root;
+struct inode_list *root, *end;
 
-char bitmap[128][4096/8];
+char bitmap[TRACKS][SECTORS/8];
 
 int check_bitmap(t,s)
 int t,s;
@@ -81,14 +76,21 @@ void print_bitmap()
 /*  TODO
  *  Implement inode table as binary tree to speedup searches
  */
-int search_inodes(name)
+int inode_search(name)
 char *name;
 {
+	if (strcmp(name,"") == 0) {
+		return -2;
+	}
 	int i;
-	for(i = 0; i < MAX_INODES; i++){
-		if(strcmp(name, i_table[i].info.name) == 0) 
+	struct inode_list *tmp = root;
+
+	for(i = 0; i < MAX_INODES && i < inode_list_size; i++){
+		tmp = tmp->next;
+		if(strcmp(name, tmp->node->info.name) == 0) 
 			return i;
 	}
+	return -1;
 }
 
 struct blockll* get_blocks(size)
@@ -103,7 +105,7 @@ int size;
 		s = i % 4096;
 		printf("checkedmap%d\t%d: %d\n", t,s,check_bitmap(t,s));
 		if (!check_bitmap(t, s)) {
-			current->next = malloc(sizeof(struct blockll));
+			current->next = calloc(1,sizeof(struct blockll));
 			current = current->next;
 			current-> next = NULL;
 			current->data.track = (char) t;
@@ -117,12 +119,32 @@ int size;
 	return i <(4096 * 128) ? root : NULL;
 }
 
+struct inode_list* inode_create(name)
+char *name;
+{
+	struct timeval *tmp_time = malloc(sizeof(struct timeval));
+
+	struct inode_list *tmp = calloc(1,sizeof(struct inode_list));
+	memcpy(&tmp->node->info.name, name, strlen(name));
+
+	gettimeofday(tmp_time, NULL);
+	tmp->node->info.create = tmp_time->tv_sec;
+	tmp->node->info.read = tmp_time->tv_sec;
+	tmp->node->info.write = tmp_time->tv_sec;
+	
+	end->next = tmp;
+	end = tmp;
+	inode_list_size++;
+
+	return tmp;
+}
+
 int inode_init()
 {
 	int n = MAX_INODES / 4;
 	int i;
 	char *ptr;
-	struct inode_list tmp;
+	struct inode_list *tmp;
 
 	if (MAX_INODES % 4 > 0)
 		n++;
@@ -136,10 +158,10 @@ int inode_init()
 
 	tmp = root;
 	for(i=0; i< MAX_INODES; i++) {
-		tmp->next = malloc(sizeof(struct inode_list));
+		tmp->next = calloc(1,sizeof(struct inode_list));
 		memcpy(&tmp->node, ptr, 64);
 		ptr += 64;
-		tmp = tmp->next
+		tmp = tmp->next;
 		inode_list_size++;
 	}
 }
@@ -149,7 +171,7 @@ void inode_save()
 {
 	int i, j;
 	char *buf = malloc(512);
-	struct inode_list tmp = root;
+	struct inode_list *tmp = root;
 
 	for (i = 0; i < MAX_INODES && tmp->next;i++) {
 		for (j = 0; j < 4; j++){
@@ -160,10 +182,39 @@ void inode_save()
 	}
 }
 
+struct inode* inode_from_fd(fd) 
+int fd;
+{
+	int i;
+	struct inode_list *tmp = root;
+
+	for (i = 0; i < fd; i++) {
+		tmp = tmp->next;
+	}
+
+	return tmp->node;
+}
+
+int tfs_init()
+{
+	dinit();
+	inode_init();
+}
+
+
 int open(fname, mode)
 char *fname, *mode;
 {
-	
+	int fd = inode_search(fname);
+	if (fd == -1) {
+		inode_create(fname);
+		return inode_list_size;
+	}
+
+	if (fd == -2)
+		return -1;
+
+	return fd;
 }
 
 int close(fd)
@@ -194,6 +245,5 @@ char *fname;
 
 int main() 
 {
-	inode_init();
-	inode_save();
+	tfs_init();
 }
