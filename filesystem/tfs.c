@@ -4,6 +4,8 @@
 #include "disk.h"
 
 #define MAX_INODES 10
+#define INODE_START (TRACKS * SECTORS) / (8 * 512)
+
 
 struct block_ptr {
 	char track;
@@ -89,7 +91,7 @@ int size;
 	struct blockll *root, *current = malloc(sizeof(struct blockll));
 	root = current;
 
-	for (i = 0; size > 0; i++) {
+	for (i = 0; size > 0 && i < (4096 * 128); i++) {
 		t = i / 4096;
 		s = i % 4096;
 		printf("checkedmap%d\t%d: %d\n", t,s,check_bitmap(t,s));
@@ -105,11 +107,10 @@ int size;
 		}
 	}
 
-	return root;
+	return i <(4096 * 128) ? root : NULL;
 }
 
-/*
-int tfs_init()
+int inode_init()
 {
 	int n = MAX_INODES / 4;
 	int i;
@@ -117,19 +118,32 @@ int tfs_init()
 	if (MAX_INODES % 4 > 0)
 		n++;
 
-	char buf[512 * n];
+	char *buf = malloc(512 * n);
 
 	for (i =0; i < n; i++) {
-		rsector(0, i, &buf + (512 * i));
+		rsector(0, i, buf + (512 * i));
 	}
-	ptr = &buf;
+	ptr = buf;
 
 	for(i=0; i< MAX_INODES; i++) {
 		memcpy(&i_table[i], ptr, 64);
-		ptr + 64;
+		ptr += 64;
 	}
 }
-*/
+
+/*save inodes to first n sectors on disk*/
+void inode_save()
+{
+	int i, j;
+	char *buf = malloc(512);
+
+	for (i = 0; i < MAX_INODES && i_table->info.name[0] != 0; i++) {
+		for (j = 0; j < 4; j++){
+			memcpy(buf + j, &i_table[(i * 4) + j], sizeof(struct inode));
+		}
+		wsector(0, INODE_START + i, buf);
+	}
+}
 
 int open(fname, mode)
 char *fname, *mode;
@@ -165,14 +179,6 @@ char *fname;
 
 int main() 
 {
-	set_bitmap(0,0);
-	set_bitmap(2,2);
-
-	printf("test 1,1: %d,  test 2,2: %d\n", check_bitmap(1,1), check_bitmap(2,2));
-	print_bitmap();
-	
-
-	struct blockll *test = get_blocks(1000);
-
-	printf("&tets= %x\n", test);
+	inode_init();
+	inode_save();
 }
