@@ -4,9 +4,9 @@
 #include <sys/time.h>
 #include "disk.h"
 
-#define MAX_INODES 10
+#define MAX_INODES 1000
 #define INODE_START (TRACKS * SECTORS) / (8 * 512)
-
+#define MAX_FILES 50
 
 struct block_ptr {
 	char track;
@@ -35,11 +35,23 @@ struct inode_list{
 	struct inode_list *next;
 };
 
+struct file {
+	struct inode *node;
+	int mode;
+	int next_sec;
+	int free;
+};
+
 
 int inode_list_size = 0;
 struct inode_list *root, *end;
 
 char bitmap[TRACKS][SECTORS/8];
+
+struct file files[MAX_FILES];
+int size;
+
+
 
 int check_bitmap(t,s)
 int t,s;
@@ -76,11 +88,11 @@ void print_bitmap()
 /*  TODO
  *  Implement inode table as binary tree to speedup searches
  */
-int inode_search(name)
+struct inode* inode_search(name)
 char *name;
 {
 	if (strcmp(name,"") == 0) {
-		return -2;
+		return -1;
 	}
 	int i;
 	struct inode_list *tmp = root;
@@ -88,9 +100,9 @@ char *name;
 	for(i = 0; i < MAX_INODES && i < inode_list_size; i++){
 		tmp = tmp->next;
 		if(strcmp(name, tmp->node->info.name) == 0) 
-			return i;
+			return tmp->node;
 	}
-	return -1;
+	return -2;
 }
 
 struct blockll* get_blocks(size)
@@ -195,24 +207,46 @@ int fd;
 	return tmp->node;
 }
 
+int find_fd()
+{
+	int i;
+	for (i = 0; i < size; i++) {
+		if (files[i].free)
+			return i;
+	}
+}
+
 int tfs_init()
 {
+	int i;
 	dinit();
 	inode_init();
+	for (i = 0; i < MAX_FILES; i++) {
+		files[i].free = 1;
+	}
 }
 
 
 int open(fname, mode)
 char *fname, *mode;
 {
-	int fd = inode_search(fname);
-	if (fd == -1) {
-		inode_create(fname);
-		return inode_list_size;
-	}
+	struct inode *fnode = inode_search(fname);
+	int fd;
 
-	if (fd == -2)
+	if (fnode == -1)
 		return -1;
+	
+	if (fnode == -2)
+		fnode = inode_create(fname)->node;
+
+	fd = find_fd();
+
+	files[fd].node = fnode;
+	files[fd].mode = *mode;
+	files[fd].next_sec = 0;
+	files[fd].free = 0;
+
+	size++;
 
 	return fd;
 }
@@ -220,7 +254,11 @@ char *fname, *mode;
 int close(fd)
 int fd;
 {
-	
+	if (files[fd].free)
+		return -1;
+
+	files[fd].free = 1;
+	return 1;
 }
 
 int read(fd, buf)
