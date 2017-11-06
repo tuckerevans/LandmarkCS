@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/select.h>
 
-#define BUFFER_SIZE 10
+#define BUFFER_SIZE 1024
 
 struct number_val {
 	int val;
@@ -48,27 +48,27 @@ int main(argc, argv)
 int argc;
 char **argv;
 {
-	int sock = 0, valread, start_ptr = 0, end_ptr = 1, qset, avg, i, cnt;
+	int sock = 0, valread, start_ptr = -1, end_ptr = 0, qset, i;
+	double avg = 0, cnt;
 	char buffer[1024] = {0};
 	num num_buffer[BUFFER_SIZE];	
 	fd_set rs, ws, es;
-	struct timeval now, ww;
-
-	ww.tv_sec = 5;
-	ww.tv_usec = 500000;
+	struct timeval now, *ww, tmp;
 
 	sock = sock_init(argv);
-	
+
 	while (1) {
 		FD_ZERO(&rs); FD_ZERO(&ws); FD_ZERO(&es);
 		FD_SET(sock, &rs);
 
-		qset = select(sock + 1, &rs, (fd_set *) 0, (fd_set *) 0, &ww);
+		qset = select(sock + 1, &rs, (fd_set *) 0, (fd_set *) 0, ww);
 		
 		gettimeofday(&now, NULL);
 		now.tv_sec = now.tv_sec - 60;
 
-		ww.tv_sec = 5;
+		ww = &tmp;
+		tmp.tv_sec = 0;
+		tmp.tv_usec = 500000;
 
 		if (FD_ISSET(sock, &rs)) {
 			valread = read(sock, buffer, 1024);
@@ -84,7 +84,9 @@ char **argv;
 				}
 			}
 		}
-/*
+
+		start_ptr = start_ptr == -1 ? 0 : start_ptr;
+
 		if (start_ptr < end_ptr) {
 			for (i = start_ptr; i < end_ptr; i++) {
 				if (num_buffer[i].tv.tv_sec <= now.tv_sec) {
@@ -105,7 +107,7 @@ char **argv;
 			}
 
 			start_ptr %= BUFFER_SIZE;
-		}*/
+		}
 
 		avg = 0;
 		cnt = start_ptr > end_ptr ? (BUFFER_SIZE - start_ptr + end_ptr) : (end_ptr - start_ptr);
@@ -124,7 +126,7 @@ char **argv;
 			}
 		}
 
-		printf("avg: %10d, start: %2d, end: %2d, cnt: %2d, valread: %d, time: %d\n", avg, start_ptr, end_ptr, cnt, valread, num_buffer[start_ptr].tv.tv_sec);
+		printf("avg: %10.5f\n", avg);
 /*
  * valread = read(sock, buffer, 1024);
  */		
