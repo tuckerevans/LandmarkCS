@@ -8,12 +8,10 @@
 
 #define BUFFER_SIZE 1024
 
-struct number_val {
+typedef struct number_val {
 	int val;
 	struct timeval tv;
-};
-
-typedef struct number_val num;
+} num;
 
 int sock_init(argv) 
 char **argv;
@@ -85,25 +83,23 @@ char **argv;
 			}
 		}
 
-		start_ptr = start_ptr == -1 ? 0 : start_ptr;
+		if (start_ptr == -1) 
+			start_ptr = 0;
 
 		if (start_ptr < end_ptr) {
 			for (i = start_ptr; i < end_ptr; i++) {
-				if (num_buffer[i].tv.tv_sec <= now.tv_sec) {
+				if (num_buffer[i].tv.tv_sec <= now.tv_sec)
 					start_ptr = i + 1;
-				}
 			}
 		} else {
 			for (i = start_ptr; i < BUFFER_SIZE; i++) {
-				if (num_buffer[i].tv.tv_sec <= now.tv_sec) {
+				if (num_buffer[i].tv.tv_sec <= now.tv_sec)
 					start_ptr = i + 1;
-				}
 			}
 
 			for (i = 0; i < end_ptr; i++) {
-				if (num_buffer[i].tv.tv_sec <= now.tv_sec) {
+				if (num_buffer[i].tv.tv_sec <= now.tv_sec)
 					start_ptr = i + 1;
-				}
 			}
 
 			start_ptr %= BUFFER_SIZE;
@@ -114,23 +110,15 @@ char **argv;
 		cnt = cnt == 0 ? 10 : cnt;
 
 		if (start_ptr < end_ptr) {
-			for (i = start_ptr; i < end_ptr; i++){
+			for (i = start_ptr; i < end_ptr; i++)
 				avg += num_buffer[i].val / cnt;
-			}
 		} else {
-			for (i = start_ptr; i < BUFFER_SIZE; i++){
+			for (i = start_ptr; i < BUFFER_SIZE; i++)
 				avg += num_buffer[i].val / cnt;
-			}
-			for (i = 0; i < end_ptr; i++) {
+			for (i = 0; i < end_ptr; i++)
 				avg += num_buffer[i].val /cnt;
-			}
 		}
 
 		printf("avg: %10.5f\n", avg);
-/*
- * valread = read(sock, buffer, 1024);
- */		
 	}
-
-
 }
