@@ -55,6 +55,9 @@ char **argv;
 
 	sock = sock_init(argv);
 
+	ww = NULL;
+
+	printf("Connected, waiting for numbers...\n");
 	while (1) {
 		FD_ZERO(&rs); FD_ZERO(&ws); FD_ZERO(&es);
 		FD_SET(sock, &rs);
@@ -75,7 +78,7 @@ char **argv;
 					end_ptr = 0;
 				if (end_ptr != start_ptr) {
 					gettimeofday(&(num_buffer[end_ptr].tv), NULL);
-					num_buffer[end_ptr].val = atoi(buffer);
+					num_buffer[end_ptr].val = atoi(buffer + i);
 					end_ptr++;
 				} else {
 					printf("dropping number...\n");
@@ -93,6 +96,12 @@ char **argv;
 			}
 		} else {
 			for (i = start_ptr; i < BUFFER_SIZE; i++) {
+					num_buffer[end_ptr].val = atoi(buffer);
+					end_ptr++;
+					num_buffer[end_ptr].val = atoi(buffer);
+					end_ptr++;
+					num_buffer[end_ptr].val = atoi(buffer);
+					end_ptr++;
 				if (num_buffer[i].tv.tv_sec <= now.tv_sec)
 					start_ptr = i + 1;
 			}
