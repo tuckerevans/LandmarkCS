@@ -46,23 +46,15 @@ func addLinks(doc *goquery.Document, jobs chan link, current link, depth int, wo
 				Prev[u.String()] = true
 			}
 			mutex.Unlock()
-		} else {
-			fmt.Printf("%s Failed: contains: %v 2: %v\n", u.String(), strings.Contains(u.String(), base), validLink(u.String()))
 		}
 	})
 }
 
 func consume(doc *goquery.Document, worker_id int) {
-	var title string
-	doc.Find("title").Each(func(index int, item *goquery.Selection) {
-		title = item.Text()
-	})
-	fmt.Println(title)
 }
 
 func worker(done chan bool, jobs chan link, depth int, id int) {
 	for {
-		fmt.Printf("%d Waiting... buffered: %d\n", id, len(jobs))
 		select {
 		case j := <-jobs:
 			if j.depth < depth {
@@ -75,9 +67,7 @@ func worker(done chan bool, jobs chan link, depth int, id int) {
 				fmt.Printf("worker %d Working on %s depth: %d...\n", id, j.u.String(), j.depth)
 
 				consume(doc, id)
-				fmt.Println("Adding Links")
 				addLinks(doc, jobs, j, j.depth, id)
-				fmt.Println("Done Adding Links")
 			}
 		case <-time.After(time.Second * 10):
 			fmt.Printf("Worker %d done\n", id)
@@ -110,7 +100,6 @@ func main() {
 	if base == os.Args[1] {
 		panic(base)
 	}
-	fmt.Println(base)
 
 	d, _ = strconv.Atoi(os.Args[2])
 
@@ -131,10 +120,6 @@ func main() {
 	if !u.IsAbs() {
 		panic("Cannot start with relative url")
 	}
-	fmt.Println(u)
-	fmt.Println(u.RawPath)
-	fmt.Println(u.String())
-	fmt.Println("jobs")
 	jobs <- link{u, 0}
 
 	//send first job
