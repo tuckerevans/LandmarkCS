@@ -1,11 +1,12 @@
-
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <types.h>
+#include <sys/types.h>
+#include <sys/select.h>
+#include <time.h>
 
 
 int main(argc, argv)
@@ -14,7 +15,7 @@ char **argv;
 {
 	int shmid, i, pid, id;
 	char *mem;
-	timeval *s;
+	struct timeval *s;
 
 	if (argc != 1) {
 		printf("usage: reader [id]\n");
@@ -42,7 +43,7 @@ char **argv;
 
 
 	while (1) {
-		s->tv_sec = rand() % (id * 2;
+		s->tv_sec = rand() % (id * 2);
 		for (i = 0; i < 1<<14; i++) {
 			mem[i]= 0x30 + id;
 			select(0, NULL, NULL, NULL, s);

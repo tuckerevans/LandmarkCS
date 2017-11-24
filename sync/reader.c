@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <time.h>
+#include <sys/select.h>
 
 
 int main(argc, argv)
@@ -12,8 +14,8 @@ char **argv;
 {
 	int shmid, i, pid, id;
 	char *mem, filename[50];
-	FILE fd;
-	timeval *s;
+	FILE *fd;
+	struct timeval *s;
 
 	if (argc != 1) {
 		printf("usage: reader [id]\n");
