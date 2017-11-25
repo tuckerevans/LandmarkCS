@@ -1,33 +1,40 @@
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
-#include <stdlib.h>
-#include <unistd.h>
+#include <errno.h>
+#include <signal.h>
 #include <stdio.h>
-#include <time.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
 #include <sys/select.h>
+#include <sys/shm.h>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
 
+char *mem;
+
+void quit(signum)
+int signum;
+{
+	shmdt(mem);
+	exit(1);
+}
 
 int main(argc, argv)
 int argc;
 char **argv;
 {
+printf("\tR STARTING\n");
 	int shmid, i, pid, id;
-	char *mem, filename[50];
+	char filename[50];
 	FILE *fd;
-	struct timeval *s;
 
-	if (argc != 1) {
+	if (argc < 2) {
 		printf("usage: reader [id]\n");
 		exit(1);
 	}
 
 	id = atoi(argv[1]);
+printf("\tR%d. started...\n", id);
 
-	if (argc < 2) {
-		printf("usage: sync [number readers] [number writers]\n");
-		exit(1);
-	}
 
 	if ((shmid = shmget(52, 1<<14, IPC_CREAT | 0666)) == -1){
 		perror("shmget: shmget failed");
@@ -38,9 +45,12 @@ char **argv;
 		perror("shmat");
 		exit(1);
 	}
+	signal(SIGQUIT, quit);
+printf("\tR%d. SHMID: %d\n", id, shmid);
 
 	sprintf(filename, "reader.%d", id);
 	
+printf("\tR%d. opening file \"%s\"...\n", id, filename);
 	fd = fopen(filename, "a");
 
 	if (!fd) {
@@ -50,12 +60,15 @@ char **argv;
 	srand(time(NULL));
 
 	while (1) {
-		s->tv_sec = rand() % id;
+printf("\tR%d. reading...\n", id);
 		for (i = 0; i < 1<<14; i++) {
 			fprintf(fd, "%c", *(mem + i));
 			fflush(fd);
 		}
+		fprintf(fd, "\n");
+		fflush(fd);
 
-		select(0, NULL, NULL, NULL, s);
+printf("\tR%d. waiting...\n", id);
+		sleep(rand() % (id + 1));
 	}
 }
