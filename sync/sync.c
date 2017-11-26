@@ -1,15 +1,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ipc.h>
+#include <sys/sem.h>
 #include <sys/shm.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
+#define NSEM 3
+
+union semun {
+	int val;
+	struct semid_ds *buf;
+	ushort *array;
+};
+
+
+int shmid, semid;
+
 void quit(signum)
 int signum;
 {
 	shmctl(shmid, IPC_RMID, NULL);
+	semctl(semid, IPC_RMID, 0);
 }
 
 
@@ -17,8 +30,9 @@ int main(argc, argv)
 int argc;
 char **argv;
 {
-	int shmid, i, pid, n_read, n_write, w;
+	int i, pid, n_read, n_write, w;
 	char *mem, **arg_r, **arg_w;
+	union semun semarg;
 
 	if (argc < 2) {
 		printf("usage: sync [number readers] [number writers]\n");
@@ -36,12 +50,26 @@ char **argv;
 		perror("shmat");
 		exit(1);
 	}
+printf("Sshmid: %x\n", shmid);
 	signal(SIGQUIT, quit);
 
-printf("\nSHMID: %d\nsetting initial memory values...\n", shmid);
 	for (i = 0; i < 1<<14; i++) {
 		*(mem + i) = 0x30;
 	}
+
+	if ((semid = semget(shmid, NSEM, 0666 | IPC_CREAT)) == -1) {
+		perror("Ssemget: ");
+		exit(1);
+	}
+
+	semarg.val = 1;
+	for (i = 0; i < NSEM; i++) {
+		if ((semctl(semid, i, SETVAL, semarg)) == -1) {
+			perror("semctl: ");
+			exit(1);
+		}
+	}
+
 
 	arg_r = malloc(sizeof(char*) * 3);
 	arg_w = malloc(sizeof(char*) * 3);
@@ -57,11 +85,8 @@ printf("\nSHMID: %d\nsetting initial memory values...\n", shmid);
 	*(arg_r + 2) = NULL;
 	*(arg_w + 2) = NULL;
 
-printf("forking readers...\n");
 	for (i = 0; i < n_read; i++){
-printf("sprintf...\n");
 		sprintf(*(arg_r + 1), "%d", i);
-printf("\t%d\n",i);
 		if (pid = fork()) {
 			/* printf("starting reader %d...\n", i); */
 		} else {
@@ -70,10 +95,8 @@ printf("\t%d\n",i);
 		}
 	}
 
-printf("forking writers...\n");
 	for (i = 0; i < n_write; i++) {
 		sprintf(*(arg_w + 1), "%d", i);
-printf("\t%d\n", i);
 		if (pid = fork()) {
 			/* printf("starting writer %d...\n", i); */
 		} else {
@@ -89,7 +112,7 @@ printf("sync done...\n");
  */
 	for (i = 0; i < (n_write + n_read); i++) {
 		wait(&w);
-		printf("\nReturned with code:%d\n", WTERMSIG(w));
+		printf("\nReturned with code:%d\n", WEXITSTATUS(w));
 	}
 	quit();
 }
