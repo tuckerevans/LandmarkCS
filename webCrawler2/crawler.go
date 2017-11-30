@@ -1,5 +1,7 @@
 package main
 
+import "crypto/md5"
+import "sync/atomic"
 import "os"
 import "fmt"
 import "log"
@@ -19,6 +21,7 @@ var mutex *sync.Mutex
 var Prev map[string]bool
 var tFile *os.File
 var base string
+var links_visited uint64 = 0
 
 func validLink(s string) bool {
 	return true
@@ -50,25 +53,22 @@ func addLinks(doc *goquery.Document, jobs chan link, current link, depth int) {
 	})
 }
 
-func consumer(jobs chan *goquery.Document, done chan bool, links chan link) {
-	// do stuff with document
-	for {
-		select {
-		case j := <-jobs:
-			fmt.Println(j)
-		case <-time.After(time.Second * 1):
-			if len(jobs) == 0 && len(links) == 0 {
-				done <- true
-				return
-			} else {
-				fmt.Printf("docs: %d, links: %d\n", len(jobs), len(links))
-			}
-		}
-	}
+func consume(doc *goquery.Document, url link, worker_id int) {
+	f, _ := os.Create(fmt.Sprintf("./pages/%x", md5.Sum([]byte(url.u.String()))))
+	s, _ := doc.Html()
+	f.Write([]byte(s))
 }
 
-func worker(done chan bool, jobs chan link, depth int, docs chan *goquery.Document) {
+func worker(done chan bool, jobs chan link, depth int, id int, total uint64) {
 	for {
+		x := atomic.LoadUint64(&links_visited)
+		if x >= total {
+			fmt.Printf("Max links reached\n\tlinks: %d total: %d\n", x, total)
+			done <- true
+			return
+		}
+
+		atomic.AddUint64(&links_visited, 1)
 		select {
 		case j := <-jobs:
 			if j.depth < depth {
@@ -81,7 +81,8 @@ func worker(done chan bool, jobs chan link, depth int, docs chan *goquery.Docume
 
 				fmt.Printf("Adding links from %s depth: %d...\n", j.u.String(), j.depth)
 
-				addLinks(doc, jobs, j, j.depth)
+				consume(doc, j, id)
+				addLinks(doc, jobs, j, j.depth, id)
 			}
 		case <-time.After(time.Second * 10):
 			done <- true
@@ -101,10 +102,11 @@ func init() {
 }
 
 func main() {
-	var d, w int
+	var d, w, b int
+	var t uint64
 
-	if len(os.Args) < 3 {
-		fmt.Printf("usage: crawler url depth [workers]\n")
+	if len(os.Args) < 4 {
+		fmt.Printf("usage: crawler url [depth max_links] [workers]\n")
 		panic("test")
 	}
 
@@ -115,9 +117,17 @@ func main() {
 	}
 
 	d, _ = strconv.Atoi(os.Args[2])
+	b, _ = (strconv.Atoi(os.Args[3]))
+	t = uint64(b)
+	if len(os.Args) >= 4 {
+		b, _ = (strconv.Atoi(os.Args[3]))
+		t = uint64(b)
 
-	if len(os.Args) == 4 {
-		w, _ = strconv.Atoi(os.Args[3])
+	} else {
+		t = 10
+	}
+	if len(os.Args) == 5 {
+		w, _ = strconv.Atoi(os.Args[4])
 	} else {
 		w = 4
 	}
@@ -139,8 +149,7 @@ func main() {
 	//send first job
 
 	for i := 0; i < w; i++ {
-		go worker(done, links, d, docs)
-		go consumer(docs, done, links)
+		go worker(done, jobs, d, i, t)
 	}
 
 	for i := 0; i < w*2; {
