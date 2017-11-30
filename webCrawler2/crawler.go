@@ -25,7 +25,7 @@ func validLink(s string) bool {
 	//return (strings.HasSuffix(s, ".html") || strings.HasSuffix(s, "/") || strings.HasSuffix(s, "\\"))
 }
 
-func addLinks(doc *goquery.Document, jobs chan link, current link, depth int, worker_id int) {
+func addLinks(doc *goquery.Document, jobs chan link, current link, depth int) {
 	doc.Find("body a").Each(func(index int, item *goquery.Selection) {
 		link_s, _ := item.Attr("href")
 
@@ -50,27 +50,40 @@ func addLinks(doc *goquery.Document, jobs chan link, current link, depth int, wo
 	})
 }
 
-func consume(doc *goquery.Document, worker_id int) {
+func consumer(jobs chan *goquery.Document, done chan bool, links chan link) {
+	// do stuff with document
+	for {
+		select {
+		case j := <-jobs:
+			fmt.Println(j)
+		case <-time.After(time.Second * 1):
+			if len(jobs) == 0 && len(links) == 0 {
+				done <- true
+				return
+			} else {
+				fmt.Printf("docs: %d, links: %d\n", len(jobs), len(links))
+			}
+		}
+	}
 }
 
-func worker(done chan bool, jobs chan link, depth int, id int) {
+func worker(done chan bool, jobs chan link, depth int, docs chan *goquery.Document) {
 	for {
 		select {
 		case j := <-jobs:
 			if j.depth < depth {
 				doc, err := goquery.NewDocument(j.u.String())
+				docs <- doc
 				if err != nil {
 					log.Print("Error Reading Document: " + j.u.String() + err.Error())
 					break
 				}
 
-				fmt.Printf("worker %d Working on %s depth: %d...\n", id, j.u.String(), j.depth)
+				fmt.Printf("Adding links from %s depth: %d...\n", j.u.String(), j.depth)
 
-				consume(doc, id)
-				addLinks(doc, jobs, j, j.depth, id)
+				addLinks(doc, jobs, j, j.depth)
 			}
 		case <-time.After(time.Second * 10):
-			fmt.Printf("Worker %d done\n", id)
 			done <- true
 			return
 		}
@@ -109,7 +122,8 @@ func main() {
 		w = 4
 	}
 
-	jobs := make(chan link, 1024*1024)
+	links := make(chan link, 1024*1024)
+	docs := make(chan *goquery.Document, 100)
 	done := make(chan bool)
 
 	u, err := url.Parse(os.Args[1])
@@ -120,28 +134,24 @@ func main() {
 	if !u.IsAbs() {
 		panic("Cannot start with relative url")
 	}
-	jobs <- link{u, 0}
+	links <- link{u, 0}
 
 	//send first job
 
 	for i := 0; i < w; i++ {
-		go worker(done, jobs, d, i)
+		go worker(done, links, d, docs)
+		go consumer(docs, done, links)
 	}
 
-	for i := 0; i < w; {
-		select {
-		case <-done:
-			fmt.Printf("%d done\n", i)
-			i++
-		case <-time.After(1 * time.Second):
-			if len(jobs) == (1024 * 1024) {
-				i = w
-			}
-		}
+	for i := 0; i < w*2; {
+		<-done
+
+		fmt.Printf("%d done\n", i)
+		i++
 	}
 
 	tFile.Close()
 	close(done)
-	fmt.Println(len(jobs))
-	close(jobs)
+	close(links)
+	close(docs)
 }
