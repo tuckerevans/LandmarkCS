@@ -1,16 +1,16 @@
 package main
 
 import "crypto/md5"
-import "sync/atomic"
-import "os"
 import "fmt"
+import "github.com/PuerkitoBio/goquery"
 import "log"
-import "time"
-import "sync"
+import "net/url"
+import "os"
 import "strconv"
 import "strings"
-import "net/url"
-import "github.com/PuerkitoBio/goquery"
+import "sync"
+import "sync/atomic"
+import "time"
 
 type link struct {
 	u     *url.URL
@@ -19,7 +19,6 @@ type link struct {
 
 var mutex *sync.Mutex
 var Prev map[string]bool
-var tFile *os.File
 var base string
 var links_visited uint64 = 0
 
@@ -63,7 +62,6 @@ func worker(done chan bool, jobs chan link, depth int, id int, total uint64) {
 	for {
 		x := atomic.LoadUint64(&links_visited)
 		if x >= total {
-			fmt.Printf("Max links reached\n\tlinks: %d total: %d\n", x, total)
 			done <- true
 			return
 		}
@@ -79,7 +77,7 @@ func worker(done chan bool, jobs chan link, depth int, id int, total uint64) {
 					break
 				}
 
-				fmt.Printf("Adding links from %s depth: %d...\n", j.u.String(), j.depth)
+				fmt.Printf("worker %d Working on %s...\n", id, j.u.String())
 
 				consume(doc, j, id)
 				addLinks(doc, jobs, j, j.depth, id)
@@ -95,18 +93,26 @@ func init() {
 	mutex = &sync.Mutex{}
 	Prev = make(map[string]bool)
 	var err error
-	tFile, err = os.Create("./test.txt")
+
+	fi, err := os.Lstat("./pages");
 	if err != nil {
-		panic(err)
+		fmt.Printf("INIT ERROR: %s\n", err);
 	}
+	
+	if (fi == nil) {
+		os.Mkdir("./pages", 0755);
+	} else if (fi.Mode().IsRegular()) {
+		panic("pages is not a valid directory\n")
+	}
+
 }
 
 func main() {
 	var d, w, b int
 	var t uint64
 
-	if len(os.Args) < 4 {
-		fmt.Printf("usage: crawler url [depth max_links] [workers]\n")
+	if len(os.Args) < 5 {
+		fmt.Printf("usage: crawler url depth max_links workers\n")
 		panic("test")
 	}
 
@@ -119,18 +125,9 @@ func main() {
 	d, _ = strconv.Atoi(os.Args[2])
 	b, _ = (strconv.Atoi(os.Args[3]))
 	t = uint64(b)
-	if len(os.Args) >= 4 {
-		b, _ = (strconv.Atoi(os.Args[3]))
-		t = uint64(b)
-
-	} else {
-		t = 10
-	}
-	if len(os.Args) == 5 {
-		w, _ = strconv.Atoi(os.Args[4])
-	} else {
-		w = 4
-	}
+	b, _ = (strconv.Atoi(os.Args[3]))
+	t = uint64(b)
+	w, _ = strconv.Atoi(os.Args[4])
 
 	links := make(chan link, 1024*1024)
 	docs := make(chan *goquery.Document, 100)
@@ -152,15 +149,17 @@ func main() {
 		go worker(done, jobs, d, i, t)
 	}
 
-	for i := 0; i < w*2; {
-		<-done
-
-		fmt.Printf("%d done\n", i)
-		i++
+	for i := 0; i < w; {
+		select {
+		case <-done:
+			i++
+		case <-time.After(1 * time.Second):
+			if len(jobs) == (1024 * 1024) {
+				i = w
+			}
+		}
 	}
 
-	tFile.Close()
 	close(done)
-	close(links)
-	close(docs)
+	close(jobs)
 }
