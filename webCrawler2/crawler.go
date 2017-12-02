@@ -27,7 +27,7 @@ func validLink(s string) bool {
 	//return (strings.HasSuffix(s, ".html") || strings.HasSuffix(s, "/") || strings.HasSuffix(s, "\\"))
 }
 
-func addLinks(doc *goquery.Document, jobs chan link, current link, depth int) {
+func addLinks(doc *goquery.Document, jobs chan link, current link, depth int, worker_id int) {
 	doc.Find("body a").Each(func(index int, item *goquery.Selection) {
 		link_s, _ := item.Attr("href")
 
@@ -71,7 +71,6 @@ func worker(done chan bool, jobs chan link, depth int, id int, total uint64) {
 		case j := <-jobs:
 			if j.depth < depth {
 				doc, err := goquery.NewDocument(j.u.String())
-				docs <- doc
 				if err != nil {
 					log.Print("Error Reading Document: " + j.u.String() + err.Error())
 					break
@@ -83,6 +82,7 @@ func worker(done chan bool, jobs chan link, depth int, id int, total uint64) {
 				addLinks(doc, jobs, j, j.depth, id)
 			}
 		case <-time.After(time.Second * 10):
+			fmt.Printf("Worker %d done\n", id)
 			done <- true
 			return
 		}
@@ -129,8 +129,7 @@ func main() {
 	t = uint64(b)
 	w, _ = strconv.Atoi(os.Args[4])
 
-	links := make(chan link, 1024*1024)
-	docs := make(chan *goquery.Document, 100)
+	jobs := make(chan link, 1024*1024)
 	done := make(chan bool)
 
 	u, err := url.Parse(os.Args[1])
@@ -141,7 +140,7 @@ func main() {
 	if !u.IsAbs() {
 		panic("Cannot start with relative url")
 	}
-	links <- link{u, 0}
+	jobs <- link{u, 0}
 
 	//send first job
 
