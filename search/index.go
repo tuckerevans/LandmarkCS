@@ -9,6 +9,7 @@ import "github.com/kennygrant/sanitize"
 import "strings"
 import "flag"
 import "errors"
+import "regexp"
 
 type index struct {
 	doc string;
@@ -20,6 +21,8 @@ type document struct {
 	title []string;
 	text []string;
 }
+
+var r *regexp.Regexp;
 
 func newDocument() *document {
 	return &document{nil, nil};
@@ -57,6 +60,11 @@ func RemoveTag(doc *goquery.Selection, tag string) {
 	});
 }
 
+func logReg(h []byte) []byte {
+	log.Printf("RegExp: %s", h);
+	return h;
+}
+
 func parseDoc(fd *os.File) (*document, error) {
 	var err error;
 	var text, t_text string;
@@ -70,7 +78,6 @@ func parseDoc(fd *os.File) (*document, error) {
 		return nil, errors.New("Can't create goquery documnt");
 	}
 
-	//TODO test kennygrant/sanatize instead of goquery
 	body = doc.Find("body");
 	RemoveTag(body, "script");
 	RemoveTag(body, "noscript");
@@ -81,20 +88,21 @@ func parseDoc(fd *os.File) (*document, error) {
 	text, err = body.Html();
 	t_text, err = title.Html();
 
+
+	text = r.ReplaceAllString(text, "> <");
+	t_text = r.ReplaceAllString(text, "> <");
+
 	r_doc = newDocument();
 
 	r_doc.text = strings.Fields(sanitize.HTML(text));
 	r_doc.title = strings.Fields(sanitize.HTML(t_text));
-	if len(r_doc.text) == 1 {
-		log.Printf("not splittin!!!!!!!!!!!\n");
-		os.Exit(1);
-	}
 
 	return r_doc, nil;
 }
 
 func init() {
 	log.SetOutput(os.Stderr);
+	r, _ = regexp.Compile("><");
 }
 
 func main() {
