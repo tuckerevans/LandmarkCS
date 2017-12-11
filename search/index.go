@@ -1,6 +1,7 @@
 package main
 
 import "os"
+import "sort"
 import "golang.org/x/net/html"
 import "log"
 import "fmt"
@@ -11,10 +12,21 @@ import "flag"
 import "errors"
 import "regexp"
 
+type document struct {
+	fname string;
+	title []string;
+	text []string;
+}
+
 type index struct {
-	doc string;
+	doc *document;
 	title bool;
 	freq int;
+}
+
+type wordSort struct {
+	w string;
+	root *wordList;
 }
 
 type wordList struct {
@@ -22,16 +34,11 @@ type wordList struct {
 	next *wordList
 }
 
-type document struct {
-	title []string;
-	text []string;
-}
+var r, nonAN, stopWords *regexp.Regexp;
 
-var r *regexp.Regexp;
-var nonAN *regexp.Regexp;
 
 func newDocument() *document {
-	return &document{nil, nil};
+	return &document{"" , nil, nil};
 }
 
 func RemoveNode(r, rn *html.Node) {
@@ -71,7 +78,7 @@ func logReg(h []byte) []byte {
 	return h;
 }
 
-func parseDoc(fd *os.File) (*document, error) {
+func parseDoc(fd *os.File, f_info os.FileInfo) (*document, error) {
 	var err error;
 	var text, t_text string;
 	var doc *goquery.Document;
@@ -104,21 +111,47 @@ func parseDoc(fd *os.File) (*document, error) {
 	text = nonAN.ReplaceAllString(text, " ");
 	t_text = nonAN.ReplaceAllString(t_text, " ");
 
+	text = stopWords.ReplaceAllString(text, "");
+	t_text = stopWords.ReplaceAllString(t_text, "");
+
 	r_doc = newDocument();
+	r_doc.fname = f_info.Name();
 	r_doc.text = strings.Fields(sanitize.HTML(text));
 	r_doc.title = strings.Fields(sanitize.HTML(t_text));
 
 	return r_doc, nil;
 }
+func boolToInt(t bool) int {
+	if t {
+		return 1;
+	}
+	return 0;
+}
 
-func printIndex(w map[string]*wordList) string {
-return "";
+func printIndex(words []wordSort, fd *os.File) {
+	var i int;
+	var cur *wordList;
+	var fname string;
+	var t int;
+	var freq float64;
+
+	for i = 0; i < len(words); i++ {
+		fmt.Fprintf(fd, "%s\n", words[i].w);
+		for cur = words[i].root; cur != nil; cur = cur.next {
+			fname = cur.this.doc.fname;
+			t = boolToInt(cur.this.title);
+			freq = float64(cur.this.freq) / float64(len(cur.this.doc.text));
+			
+			fmt.Fprintf(fd,"\t%s %d %.3f\n", fname, t, freq);
+		}
+	}
 }
 
 func init() {
 	log.SetOutput(os.Stderr);
 	r, _ = regexp.Compile("><");
-	nonAN, _ = regexp.Compile("[<>!@#&()–[{}]:;,?/*'\"]|( and)|( a)|( an)|( and)|( are)|( as)|( at)|( be)|( by)|( for)|( from)|( has)|( he)|( in)|( is)|( it)|( its)|( of)|( on)|( that)|( the)|( to)|( was)|( were)|( will)|( with)")
+	nonAN, _ = regexp.Compile("[^a-zA-Z0-9]+");
+	stopWords, _ = regexp.Compile("( and\\W)|( a\\W)|( an\\W)|( and\\W)|( are\\W)|( as\\W)|( at\\W)|( be\\W)|( by\\W)|( for\\W)|( from\\W)|( has\\W)|( he\\W)|( in\\W)|( is\\W)|( it\\W)|( its\\W)|( of\\W)|( on\\W)|( that\\W)|( the\\W)|( to\\W)|( was\\W)|( were\\W)|( will\\W)|( with\\W)")
 }
 
 func main() {
@@ -129,6 +162,7 @@ func main() {
 	var words map[string]*wordList;
 	var cur *wordList;
 	var tmp *index;
+	var sorted []wordSort;
 
 	var files []os.FileInfo;
 	var dir, fd *os.File;
@@ -175,7 +209,8 @@ func main() {
 		if err != nil {
 			log.Printf("Error reading %s/%s\n", dir_info.Name(), files[i].Name());
 		} else {
-			doc, err = parseDoc(fd);
+			fmt.Printf("Indexing %s...\n", fname);
+			doc, err = parseDoc(fd, fd_info);
 			if err != nil {
 				log.Printf("Error parsing %s/%s\n", dir_info.Name(), files[i].Name());
 			} else {
@@ -184,16 +219,16 @@ func main() {
 					w = strings.ToLower(doc.text[j]);
 
 					if words[w] == nil{
-						tmp = &index{doc: fname, title: false, freq: 1};
+						tmp = &index{doc: doc, title: false, freq: 1};
 						words[w] = &wordList{this: tmp, next: nil};
 					}
 
-					for cur = words[w];cur.next != nil && cur.this.doc != fname; cur = cur.next{}
+					for cur = words[w];cur.next != nil && cur.this.doc.fname != fname; cur = cur.next{}
 
-					if cur.this.doc == fname {
+					if cur.this.doc.fname == fname {
 						cur.this.freq++
 					} else if cur.next == nil {
-						tmp = &index{doc: fname, title: false, freq: 1};
+						tmp = &index{doc: doc, title: false, freq: 1};
 						cur.next = &wordList{this: tmp, next: nil};
 					} else {
 						panic(fmt.Sprintf("%v", cur));
@@ -204,17 +239,17 @@ func main() {
 					w = strings.ToLower(doc.title[j]);
 
 					if words[w] == nil{
-						tmp = &index{doc: fname, title: true, freq: 1};
+						tmp = &index{doc: doc, title: true, freq: 1};
 						words[w] = &wordList{this: tmp, next: nil};
 					}
 
-					for cur = words[w];cur.next != nil && cur.this.doc != fname; cur = cur.next{}
+					for cur = words[w];cur.next != nil && cur.this.doc.fname != fname; cur = cur.next{}
 
-					if cur.this.doc == fname {
+					if cur.this.doc.fname == fname {
 						cur.this.title = true;
 						cur.this.freq++;
 					} else if cur.next == nil {
-						tmp = &index{doc: fname, title: true, freq: 1};
+						tmp = &index{doc: doc, title: true, freq: 1};
 						cur.next = &wordList{this: tmp, next: nil};
 					} else {
 						panic(fmt.Sprintf("%v", cur));
@@ -222,10 +257,21 @@ func main() {
 				}
 			}
 		}
-		/* TEST PRINT */
-		for k,v := range words {
-			fmt.Printf("k: %s, doc: %s, title: %v, freq:%d\n",k,v.this.doc,v.this.title,v.this.freq);
-		}
+		fd.Close();
 	}
-
+		sorted = make([]wordSort, len(words));
+		i = 0;
+		for k,v := range words {
+			sorted[i].w = k;
+			sorted[i].root = v;
+			i++;
+		}
+		
+		sort.Slice(sorted, func(i, j int) bool {
+			return sorted[i].w < sorted[j].w;
+		});
+		
+		fd,_ = os.Create("index.dat");
+		printIndex(sorted, fd);
+		fd.Close();
 }
