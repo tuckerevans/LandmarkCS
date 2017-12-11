@@ -28,6 +28,7 @@ type document struct {
 }
 
 var r *regexp.Regexp;
+var nonAN *regexp.Regexp;
 
 func newDocument() *document {
 	return &document{nil, nil};
@@ -97,17 +98,27 @@ func parseDoc(fd *os.File) (*document, error) {
 	text = r.ReplaceAllString(text, "> <");
 	t_text = r.ReplaceAllString(text, "> <");
 
-	r_doc = newDocument();
+	text = sanitize.HTML(text);
+	t_text = sanitize.HTML(t_text);
 
+	text = nonAN.ReplaceAllString(text, " ");
+	t_text = nonAN.ReplaceAllString(t_text, " ");
+
+	r_doc = newDocument();
 	r_doc.text = strings.Fields(sanitize.HTML(text));
 	r_doc.title = strings.Fields(sanitize.HTML(t_text));
 
 	return r_doc, nil;
 }
 
+func printIndex(w map[string]*wordList) string {
+return "";
+}
+
 func init() {
 	log.SetOutput(os.Stderr);
 	r, _ = regexp.Compile("><");
+	nonAN, _ = regexp.Compile("[<>!@#&()–[{}]:;,?/*'\"]|( and)|( a)|( an)|( and)|( are)|( as)|( at)|( be)|( by)|( for)|( from)|( has)|( he)|( in)|( is)|( it)|( its)|( of)|( on)|( that)|( the)|( to)|( was)|( were)|( will)|( with)")
 }
 
 func main() {
