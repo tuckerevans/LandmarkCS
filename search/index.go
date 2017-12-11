@@ -17,6 +17,11 @@ type index struct {
 	freq int;
 }
 
+type wordList struct {
+	this *index
+	next *wordList
+}
+
 type document struct {
 	title []string;
 	text []string;
@@ -107,13 +112,16 @@ func init() {
 
 func main() {
 	//	var words map[string]index
-	var p_dir string //, fname string;
+	var p_dir, w, fname string;
 	var err error;
-	var i int;
+	var i, j int;
+	var words map[string]*wordList;
+	var cur *wordList;
+	var tmp *index;
 
 	var files []os.FileInfo;
 	var dir, fd *os.File;
-	var dir_info os.FileInfo;
+	var dir_info, fd_info os.FileInfo;
 	var dir_mode os.FileMode;
 
 	var doc *document;
@@ -121,6 +129,8 @@ func main() {
 	flag.StringVar(&p_dir, "d", "./pages", "pages directory");
 
 	flag.Parse();
+
+	words = make(map[string]*wordList);
 
 	dir, err = os.Open(p_dir);
 	if err != nil {
@@ -142,8 +152,15 @@ func main() {
 		os.Exit(1);
 	}
 
-	for i = 0; i < len(files) && i < 1; i++ {
+	for i = 0; i < len(files); i++ {
 		fd, err = os.Open(fmt.Sprintf("%s/%s", dir_info.Name(), files[i].Name()));
+		fd_info, err = fd.Stat();
+		if err != nil {
+			log.Printf("Error getting info\n");
+			os.Exit(1);
+		}
+		fname = fd_info.Name();
+
 		if err != nil {
 			log.Printf("Error reading %s/%s\n", dir_info.Name(), files[i].Name());
 		} else {
@@ -151,9 +168,52 @@ func main() {
 			if err != nil {
 				log.Printf("Error parsing %s/%s\n", dir_info.Name(), files[i].Name());
 			} else {
-				fmt.Println(doc.text);
-				fmt.Println(doc.title);
+				/* Text */
+				for j = 0; j < len(doc.text); j++ {
+					w = strings.ToLower(doc.text[j]);
+
+					if words[w] == nil{
+						tmp = &index{doc: fname, title: false, freq: 1};
+						words[w] = &wordList{this: tmp, next: nil};
+					}
+
+					for cur = words[w];cur.next != nil && cur.this.doc != fname; cur = cur.next{}
+
+					if cur.this.doc == fname {
+						cur.this.freq++
+					} else if cur.next == nil {
+						tmp = &index{doc: fname, title: false, freq: 1};
+						cur.next = &wordList{this: tmp, next: nil};
+					} else {
+						panic(fmt.Sprintf("%v", cur));
+					}
+				}
+				/* Title */
+				for j = 0; j < len(doc.title); j++ {
+					w = strings.ToLower(doc.title[j]);
+
+					if words[w] == nil{
+						tmp = &index{doc: fname, title: true, freq: 1};
+						words[w] = &wordList{this: tmp, next: nil};
+					}
+
+					for cur = words[w];cur.next != nil && cur.this.doc != fname; cur = cur.next{}
+
+					if cur.this.doc == fname {
+						cur.this.title = true;
+						cur.this.freq++;
+					} else if cur.next == nil {
+						tmp = &index{doc: fname, title: true, freq: 1};
+						cur.next = &wordList{this: tmp, next: nil};
+					} else {
+						panic(fmt.Sprintf("%v", cur));
+					}
+				}
 			}
+		}
+		/* TEST PRINT */
+		for k,v := range words {
+			fmt.Printf("k: %s, doc: %s, title: %v, freq:%d\n",k,v.this.doc,v.this.title,v.this.freq);
 		}
 	}
 
