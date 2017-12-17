@@ -12,6 +12,8 @@ import "search/index"
 import "os"
 import "fmt"
 import "sort"
+import "flag"
+import "strings"
 
 type res struct {
 	doc string;
@@ -27,6 +29,19 @@ func main() {
 	var searchBool, perWord, docAdded map[string]bool; //map[doc]bool
 	var resultSort []res;
 	var err error;
+	var fname, s string;
+	var search []string;
+
+	flag.StringVar(&fname, "f", "./index.dat", "Index file");
+	flag.StringVar(&s, "s", "" , "Search phrase");
+
+	flag.Parse();
+	if len(s) == 0 {
+		fmt.Printf("Usage: search -s \"search phrase\" [-f index_file]");
+		os.Exit(1);
+	} else {
+		search = strings.Fields(s);
+	}
 
 	scores = make(map[string]map[string]float64);
 	searchBool = make(map[string]bool);
@@ -38,13 +53,12 @@ func main() {
 
 
 
-	init_index, err = index.NewInvertedIndexFromFile("index.dat"); //TODO add flag for filename
+	init_index, err = index.NewInvertedIndexFromFile(fname);
 	if err != nil {
 		panic(err)
 	}
-
-	for i = 1; i < len(os.Args); i++ {
-		sIndex[os.Args[i]] = init_index[os.Args[i]]
+	for i = 0; i < len(search); i++ {
+		sIndex[search[i]] = init_index[search[i]]
 	}
 
 	for _, v := range sIndex {
@@ -58,9 +72,8 @@ func main() {
 		for tmp = v; tmp != nil; tmp = tmp.Next {
 			perWord[tmp.This.Doc] = true;
 		}
-
 		for d := range searchBool {
-			if _, o := perWord[d]; !o {
+			if !perWord[d] {
 				searchBool[d] = false;
 			}
 		}
