@@ -128,7 +128,6 @@ func parseDoc(fd *os.File, f_info os.FileInfo) (*document, error) {
 	r_doc.text = strings.Fields(text);
 	r_doc.title = strings.Fields(t_text);
 	r_doc.length = len(r_doc.text) + len(r_doc.title);
-	fmt.Println(r_doc.length)
 
 	return r_doc, nil;
 }
