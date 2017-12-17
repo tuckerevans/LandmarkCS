@@ -49,7 +49,6 @@ func main() {
 
 	for _, v := range sIndex {
 		for tmp = v; tmp != nil; tmp = tmp.Next {
-			perWord[tmp.This.Doc] = true;
 			searchBool[tmp.This.Doc] = true;
 			scores[tmp.This.Doc] = make(map[string]float64);
 		}
