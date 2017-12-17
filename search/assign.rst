@@ -196,15 +196,15 @@ Search for "test this" results in the following:
 ::
 
   Results: 2
-  1. docID 2, score 0.450
-  2. docID 1, score 0.230
+  1. docID c, score 0.450
+  2. docID a, score 0.230
 
 Search for "test patriots go" results in the following:
 
 ::
 
   Results: 1
-  1. docID 3, score 0.310
+  1. docID b, score 0.310
 
 Search for "cool patriots" results in the following:
 
