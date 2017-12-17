@@ -114,34 +114,21 @@ arguments after the first.
 
 .. code:: bash
 
-  Results:
-  1. docID
-  2. docID
-  3. docID
-  4. docID
-
-  4
-  3,
-  1,
-  5,
-  8,
-
-  score
-  score
-  score
-  score
-
-  0.830
-  0.814
-  0.350
-  0.108
+  Results: 4
+  1. docID, 3, score, 0.830
+  2. docID, 1, score, 0.814
+  3. docID, 5, score, 0.350
+  4. docID, 8, score, 0.108
 
 **Bonus:** You can receive 5 bonus points by implementing phrase search.
 So when the user searches for “landmark college”, assume they want
 only documents with that exact phrase. To accomplish this, you will
 need to store the positions of the terms that are stored in the
 inverted index. Then use those positions to ensure the phrase matches
-successive positions.  Zip your entire project directory and submit it
+successive positions.  
+
+
+Zip your entire project directory and submit it
 to Canvas before it is due. Make sure your output matches the
 specifications precisely to avoid losing any points. If you use any
 code you find in the Web, you must document the source in your
@@ -185,24 +172,24 @@ Test Data
 .. code::
 
   123
-  1 0 0.200
+  	a 0 0.200
   456
-  1 0 0.200
+  	a 0 0.200
   another
-  3 0 0.200
+  	b 0 0.200
   cool
-  1 1 0.200
-  cowboys
-  3 1 0.200
+  	a 1 0.200
+  patriots
+  	b 1 0.200
   go
-  3 1 0.200
+  	b 1 0.200
   test
-  1 1 0.200
-  2 0 0.500
-  3 0 0.400
+  	a 1 0.200
+  	c 0 0.500
+  	b 0 0.400
   this
-  1 0 0.200
-  2 0 0.500
+  	a 0 0.200
+  	c 0 0.500
 
 Search for "test this" results in the following:
 
