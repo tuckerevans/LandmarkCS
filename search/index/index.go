@@ -19,34 +19,34 @@ import "strconv"
  * Types *
  *********/
 
-type f_info struct {
-	word string;
-	in_title bool;
-	freq float64;
+type F_info struct {
+	Word string;
+	In_title bool;
+	Freq float64;
 };
 
-type i_info struct {
-	doc string;
-	in_title bool;
-	freq float64;
+type I_info struct {
+	Doc string;
+	In_title bool;
+	Freq float64;
 };
 
-type f_entry struct{
-	this *f_info;
-	next *f_entry;
+type F_entry struct{
+	This *F_info;
+	Next *F_entry;
 };
 
-type i_entry struct{
-	this *i_info;
-	next *i_entry;
+type I_entry struct{
+	This *I_info;
+	Next *I_entry;
 };
 
-type F_index map[string]*f_entry;
-type I_index map[string]*i_entry;
+type F_index map[string]*F_entry;
+type I_index map[string]*I_entry;
 
 type sortInverted struct{
 	w string;
-	root *i_entry;
+	root *I_entry;
 };
 
 
@@ -54,7 +54,7 @@ type sortInverted struct{
  * Forward Index Funcitons *
  ***************************/
 
-func NewForwardEntryStrings(text, title []string) (*f_entry, error) {
+func NewForwardEntryStrings(text, title []string) (*F_entry, error) {
 	return nil, errors.New("not implemented");
 }
 
@@ -62,8 +62,8 @@ func NewForwardEntryStrings(text, title []string) (*f_entry, error) {
  * Inverted Index Functions *
  ****************************/
 
-func new_i_info() *i_info{
-	return &i_info{"", false, 0.0};
+func new_I_info() *I_info{
+	return &I_info{"", false, 0.0};
 }
 
 func NewInvertedIndexFromFile(fname string) (I_index, error) {
@@ -71,8 +71,8 @@ func NewInvertedIndexFromFile(fname string) (I_index, error) {
 	var br *bufio.Reader;
 	var err error;
 	var buf []byte;
-	var tmp *i_info;
-	var cur *i_entry;
+	var tmp *I_info;
+	var cur *I_entry;
 	var index I_index;
 	var word string
 	var info []string;
@@ -90,7 +90,7 @@ func NewInvertedIndexFromFile(fname string) (I_index, error) {
 	index = make(I_index);
 
 	for buf, err = br.ReadBytes('\n'); err != io.EOF;  buf, err = br.ReadBytes('\n'){
-		tmp = new_i_info();
+		tmp = new_I_info();
 		if err != nil {
 			return nil, err;
 		}
@@ -98,17 +98,17 @@ func NewInvertedIndexFromFile(fname string) (I_index, error) {
 			word = strings.TrimSpace(string(buf));
 		} else {
 			info = strings.Fields(string(buf));
-			tmp.doc = info[0];
-			tmp.in_title = (info[1] == "1");
-			tmp.freq, _ = strconv.ParseFloat(info[2], 32);
+			tmp.Doc = info[0];
+			tmp.In_title = (info[1] == "1");
+			tmp.Freq, _ = strconv.ParseFloat(info[2], 32);
 			if (index[word] == nil) {
-				index[word] = &i_entry{this: tmp, next: nil};
+				index[word] = &I_entry{This: tmp, Next: nil};
 			} else {
 				cur = index[word];
-				for cur.next != nil {
-					cur = cur.next;
+				for cur.Next != nil {
+					cur = cur.Next;
 				}
-				cur.next = &i_entry{this: tmp, next: nil};
+				cur.Next = &I_entry{This: tmp, Next: nil};
 			}
 		}
 	}
@@ -123,15 +123,15 @@ func NewInvertedFromForward(f F_index) (I_index, error) {
 
 func (x I_index) PrintToFile(fd *os.File) error{
 	var i int;
-	var cur *i_entry;
+	var cur *I_entry;
 	var index []sortInverted;
 
 	index = x.sortIndex();
 	
 	for i = 0; i < len(index); i++ {
 		fmt.Fprintf(fd, "%s\n", index[i].w);
-		for cur = index[i].root; cur != nil; cur = cur.next {
-			fmt.Fprintf(fd, "\t%s %d %.3f\n", cur.this.doc, toInt(cur.this.in_title), cur.this.freq);
+		for cur = index[i].root; cur != nil; cur = cur.Next {
+			fmt.Fprintf(fd, "\t%s %d %.3f\n", cur.This.Doc, toInt(cur.This.In_title), cur.This.Freq);
 		}
 	}
 	return nil;

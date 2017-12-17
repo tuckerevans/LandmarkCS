@@ -16,6 +16,7 @@ type document struct {
 	fname string;
 	title []string;
 	text []string;
+	length int;
 }
 
 type index struct {
@@ -34,11 +35,12 @@ type wordList struct {
 	next *wordList
 }
 
-var r, nonAN, stopWords *regexp.Regexp;
+var r, nonAN *regexp.Regexp;
+var stopWords []*regexp.Regexp;
 
 
 func newDocument() *document {
-	return &document{"" , nil, nil};
+	return &document{"" , nil, nil, 0};
 }
 
 func RemoveNode(r, rn *html.Node) {
@@ -84,6 +86,7 @@ func parseDoc(fd *os.File, f_info os.FileInfo) (*document, error) {
 	var doc *goquery.Document;
 	var body, title *goquery.Selection;
 	var r_doc *document;
+	var i int;
 
 	doc, err = goquery.NewDocumentFromReader(fd);
 	if err != nil {
@@ -103,21 +106,29 @@ func parseDoc(fd *os.File, f_info os.FileInfo) (*document, error) {
 
 
 	text = r.ReplaceAllString(text, "> <");
-	t_text = r.ReplaceAllString(text, "> <");
+	t_text = r.ReplaceAllString(t_text, "> <");
 
 	text = sanitize.HTML(text);
 	t_text = sanitize.HTML(t_text);
 
+	text = strings.ToLower(text);
+	t_text = strings.ToLower(t_text);
+
 	text = nonAN.ReplaceAllString(text, " ");
 	t_text = nonAN.ReplaceAllString(t_text, " ");
 
-	text = stopWords.ReplaceAllString(text, "");
-	t_text = stopWords.ReplaceAllString(t_text, "");
 
+	for i = 0; i < len(stopWords); i++ {
+		text = stopWords[i].ReplaceAllString(text, " ");
+		t_text = stopWords[i].ReplaceAllString(t_text, " ");
+	}
 	r_doc = newDocument();
+
 	r_doc.fname = f_info.Name();
-	r_doc.text = strings.Fields(sanitize.HTML(text));
-	r_doc.title = strings.Fields(sanitize.HTML(t_text));
+	r_doc.text = strings.Fields(text);
+	r_doc.title = strings.Fields(t_text);
+	r_doc.length = len(r_doc.text) + len(r_doc.title);
+	fmt.Println(r_doc.length)
 
 	return r_doc, nil;
 }
@@ -140,7 +151,7 @@ func printIndex(words []wordSort, fd *os.File) {
 		for cur = words[i].root; cur != nil; cur = cur.next {
 			fname = cur.this.doc.fname;
 			t = boolToInt(cur.this.title);
-			freq = float64(cur.this.freq) / float64(len(cur.this.doc.text));
+			freq = float64(cur.this.freq) / float64(cur.this.doc.length);
 			
 			fmt.Fprintf(fd,"\t%s %d %.3f\n", fname, t, freq);
 		}
@@ -148,10 +159,125 @@ func printIndex(words []wordSort, fd *os.File) {
 }
 
 func init() {
+	var err error;
 	log.SetOutput(os.Stderr);
-	r, _ = regexp.Compile("><");
-	nonAN, _ = regexp.Compile("[^a-zA-Z0-9]+");
-	stopWords, _ = regexp.Compile("( and\\W)|( a\\W)|( an\\W)|( and\\W)|( are\\W)|( as\\W)|( at\\W)|( be\\W)|( by\\W)|( for\\W)|( from\\W)|( has\\W)|( he\\W)|( in\\W)|( is\\W)|( it\\W)|( its\\W)|( of\\W)|( on\\W)|( that\\W)|( the\\W)|( to\\W)|( was\\W)|( were\\W)|( will\\W)|( with\\W)")
+	r, err = regexp.Compile("><");
+	if err != nil {
+		panic(err);
+	}
+	nonAN, err = regexp.Compile("[^a-zA-Z0-9]+");
+	if err != nil {
+		panic(err);
+	}
+	//TODO add func to read in stop words from a file;
+	stopWords = make([]*regexp.Regexp, 26)
+	if err != nil {
+		panic(err);
+	}
+	stopWords[0], err = regexp.Compile("\\W+and\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[1], err = regexp.Compile("\\W+a\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[2], err = regexp.Compile("\\W+an\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[3], err = regexp.Compile("\\W+and\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[4], err = regexp.Compile("\\W+are\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[5], err = regexp.Compile("\\W+as\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[6], err = regexp.Compile("\\W+at\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[7], err = regexp.Compile("\\W+be\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[8], err = regexp.Compile("\\W+by\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[9], err = regexp.Compile("\\W+for\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[10], err = regexp.Compile("\\W+from\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[11], err = regexp.Compile("\\W+has\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[12], err = regexp.Compile("\\W+he\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[13], err = regexp.Compile("\\W+in\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[14], err = regexp.Compile("\\W+is\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[15], err = regexp.Compile("\\W+it\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[16], err = regexp.Compile("\\W+its\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[17], err = regexp.Compile("\\W+of\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[18], err = regexp.Compile("\\W+on\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[19], err = regexp.Compile("\\W+that\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[20], err = regexp.Compile("\\W+the\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[21], err = regexp.Compile("\\W+to\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[22], err = regexp.Compile("\\W+was\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[23], err = regexp.Compile("\\W+were\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[24], err = regexp.Compile("\\W+will\\W+");
+	if err != nil {
+		panic(err);
+	}
+	stopWords[25], err = regexp.Compile("\\W+with\\W+");
+	if err != nil {
+		panic(err);
+	}
 }
 
 func main() {
@@ -219,7 +345,7 @@ func main() {
 					w = strings.ToLower(doc.text[j]);
 
 					if words[w] == nil{
-						tmp = &index{doc: doc, title: false, freq: 1};
+						tmp = &index{doc: doc, title: false, freq: 0};
 						words[w] = &wordList{this: tmp, next: nil};
 					}
 
@@ -239,7 +365,7 @@ func main() {
 					w = strings.ToLower(doc.title[j]);
 
 					if words[w] == nil{
-						tmp = &index{doc: doc, title: true, freq: 1};
+						tmp = &index{doc: doc, title: true, freq: 0};
 						words[w] = &wordList{this: tmp, next: nil};
 					}
 
